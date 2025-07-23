@@ -1,163 +1,456 @@
+<script type="text/javascript">
+  var gk_isXlsx = false;
+  var gk_xlsxFileLookup = {};
+  var gk_fileData = {};
+  function filledCell(cell) {
+    return cell !== "" && cell != null;
+  }
+  function loadFileData(filename) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+      try {
+        var workbook = XLSX.read(gk_fileData[filename], { type: "base64" });
+        var firstSheetName = workbook.SheetNames[0];
+        var worksheet = workbook.Sheets[firstSheetName];
+
+        // Convert sheet to JSON to filter blank rows
+        var jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          blankrows: false,
+          defval: "",
+        });
+        // Filter out blank rows (rows where all cells are empty, null, or undefined)
+        var filteredData = jsonData.filter((row) => row.some(filledCell));
+
+        // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+        var headerRowIndex = filteredData.findIndex(
+          (row, index) =>
+            row.filter(filledCell).length >=
+            filteredData[index + 1]?.filter(filledCell).length
+        );
+        // Fallback
+        if (headerRowIndex === -1 || headerRowIndex > 25) {
+          headerRowIndex = 0;
+        }
+
+        // Convert filtered JSON back to CSV
+        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+        csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+        return csv;
+      } catch (e) {
+        console.error(e);
+        return "";
+      }
+    }
+    return gk_fileData[filename] || "";
+  }
+</script>
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Responsive Age & Gap Calculator</title>
+    <title>Age Calculator</title>
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#42a5f5" />
     <link rel="icon" href="icon-192.png" type="image/png" />
-
     <style>
-      :root {
-        --primary: #42a5f5;
-        --secondary: #7e57c2;
-        --text: #333;
-        --light-bg: #f4f6f8;
-        --card-bg: #ffffffcc;
-      }
-
-      * {
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: linear-gradient(135deg, #6e8efb, #a777e3);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 10px;
         box-sizing: border-box;
       }
 
-      body {
-        font-family: "Segoe UI", sans-serif;
-        background: linear-gradient(135deg, #e0f7fa, #fce4ec);
-        margin: 0;
-        padding: 0;
-        color: var(--text);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-      }
-      .gujarati-title {
-        font-size: 1.1rem;
-        font-weight: bold;
-        color: #088cff; /* deep purple shade */
-        margin: 10px 0 6px;
-        display: block;
-      }
-
       .container {
-        background: var(--card-bg);
-        backdrop-filter: blur(12px);
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        padding: 30px;
-        width: 100%;
-        max-width: 450px;
-        margin: 20px;
-      }
-
-      h2 {
+        max-width: 100%;
+        width: 700px;
+        padding: 15px;
         text-align: center;
-        margin-bottom: 24px;
-        font-size: 1.5rem;
+        background-color: #ffffff;
+        border-radius: 15px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        box-sizing: border-box;
       }
 
-      label {
-        font-weight: bold;
-        display: block;
-        margin-bottom: 4px;
-        margin-top: 12px;
-      }
-
-      input[type="date"] {
-        width: 100%;
-        padding: 10px;
-        font-size: 1rem;
-        border-radius: 8px;
-        border: 1px solid #ccc;
-        margin-bottom: 12px;
-      }
-
-      button {
-        width: 100%;
-        padding: 12px;
-        font-size: 1rem;
-        border: none;
-        border-radius: 8px;
-        background: linear-gradient(to right, var(--primary), var(--secondary));
-        color: white;
-        cursor: pointer;
-        margin-top: 4px;
-        transition: background 0.3s ease;
-      }
-
-      button:hover {
-        background: linear-gradient(to right, #1e88e5, #5e35b1);
-      }
-
-      .result {
-        background-color: #f9f9f9;
-        padding: 12px;
-        margin-top: 14px;
-        border-radius: 8px;
-        font-size: 0.95rem;
-        line-height: 1.5;
+      h1 {
+        color: #2c3e50;
+        margin-bottom: 15px;
+        font-size: clamp(18px, 4.5vw, 20px);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
       }
 
       .section {
-        margin-top: 24px;
-        border-top: 1px dashed #ccc;
-        padding-top: 16px;
+        margin: 10px 0;
+        padding: 15px;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        background-color: #f9fafb;
+        transition: transform 0.2s;
       }
 
-      @media (max-width: 480px) {
+      .section:hover {
+        transform: translateY(-3px);
+      }
+
+      .section h2 {
+        color: #1e3a8a;
+        font-size: clamp(14px, 3.5vw, 16px);
+        margin-bottom: 10px;
+        font-weight: 500;
+      }
+
+      .input-group {
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: center;
+        gap: 5px;
+        margin-bottom: 10px;
+      }
+
+      .date-gap {
+        margin-top: 20px; /* Increased gap between First Date and Second Date */
+      }
+
+      .input-group > div {
+        flex: 1 1 33%;
+        min-width: 80px;
+      }
+
+      label {
+        font-size: clamp(10px, 2.5vw, 11px);
+        color: #34495e;
+        display: block;
+        margin-bottom: 3px;
+        font-weight: 500;
+      }
+
+      select {
+        padding: 6px;
+        font-size: clamp(10px, 2.5vw, 11px);
+        border: 1px solid #d1d5db;
+        border-radius: 5px;
+        width: 100%;
+        background-color: #ffffff;
+        box-sizing: border-box;
+        transition: border-color 0.3s, box-shadow 0.3s;
+        appearance: none;
+        background-image: url('data:image/svg+xml;utf8,<svg fill="%2334495e" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+      }
+
+      select:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      button {
+        padding: 8px 15px;
+        font-size: clamp(12px, 3vw, 13px);
+        background: linear-gradient(45deg, #3b82f6, #2563eb);
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 8px;
+        width: 100%;
+        max-width: 180px;
+        font-weight: 500;
+        transition: background 0.3s, transform 0.2s;
+      }
+
+      button:hover {
+        background: linear-gradient(45deg, #2563eb, #1e40af);
+        transform: translateY(-2px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      .result {
+        margin-top: 10px;
+        padding: 10px;
+        background-color: #f1f3f5;
+        border-radius: 8px;
+        display: none;
+        text-align: left;
+        border-left: 4px solid #3b82f6;
+      }
+
+      .result h3 {
+        margin: 0 0 8px;
+        color: #1e3a8a;
+        font-size: clamp(12px, 3vw, 13px);
+        font-weight: 500;
+      }
+
+      .result p {
+        margin: 3px 0;
+        font-size: clamp(12px, 3vw, 13px);
+        line-height: 1.4;
+        color: #1f2937;
+      }
+
+      .gujarati {
+        font-family: "Shruti", Arial, sans-serif;
+        font-size: clamp(12px, 3vw, 13px);
+      }
+
+      .error {
+        color: #dc2626;
+        font-size: clamp(10px, 2.5vw, 11px);
+        margin-top: 8px;
+        min-height: 15px;
+        text-align: center;
+      }
+
+      @media (min-width: 600px) {
+        .input-group > div {
+          min-width: 100px;
+        }
+
         .container {
           padding: 20px;
         }
 
-        h2 {
-          font-size: 1.3rem;
+        .section {
+          padding: 20px;
         }
 
         button {
-          font-size: 0.95rem;
+          width: auto;
+          max-width: 180px;
         }
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h2>Age & Gap Calculator</h2>
+      <h1>Age Calculator / ઉંમર ગણતરી</h1>
 
-      <!-- Age Calculation -->
-      <div>
-        <label class="gujarati-title" for="birthDate"
-          >|| તમારી ઉંમર જાણવા માટે. ||</label
-        >
-        <label for="birthDate">Date of Birth || જન્મ તારીખ પસંદ કરો.</label>
-        <input type="date" id="birthDate" />
-        <button onclick="calculateAge()">Calculate Age</button>
-        <div class="result" id="ageResult"></div>
+      <!-- Section 1: Age from Birth Date to Current Date -->
+      <div class="section">
+        <h2>Calculate Age from Birth Date / જન્મ તારીખથી ઉંમર ગણો</h2>
+        <div class="input-group">
+          <div>
+            <label for="birthDay">Day / દિવસ:</label>
+            <select id="birthDay">
+              <option value="">Day</option>
+            </select>
+          </div>
+          <div>
+            <label for="birthMonth">Month / મહિનો:</label>
+            <select id="birthMonth">
+              <option value="">Month</option>
+              <option value="1">January / જાન્યુઆરી</option>
+              <option value="2">February / ફેબ્રુઆરી</option>
+              <option value="3">March / માર્ચ</option>
+              <option value="4">April / એપ્રિલ</option>
+              <option value="5">May / મે</option>
+              <option value="6">June / જૂન</option>
+              <option value="7">July / જુલાઈ</option>
+              <option value="8">August / ઓગસ્ટ</option>
+              <option value="9">September / સપ્ટેમ્બર</option>
+              <option value="10">October / ઓક્ટોબર</option>
+              <option value="11">November / નવેમ્બર</option>
+              <option value="12">December / ડિસેમ્બર</option>
+            </select>
+          </div>
+          <div>
+            <label for="birthYear">Year / વર્ષ:</label>
+            <select id="birthYear">
+              <option value="">Year</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="calculateAgeFromBirth()">
+          Calculate Age / ઉંમર ગણો
+        </button>
+        <div id="birthError" class="error"></div>
+        <div id="birthResult" class="result">
+          <h3>Your Age / તમારી ઉંમર:</h3>
+          <p id="birthAgeOutputEnglish"></p>
+          <p id="birthAgeOutputGujarati" class="gujarati"></p>
+        </div>
       </div>
 
-      <!-- Gap Calculation -->
+      <!-- Section 2: Duration Between Two Dates -->
       <div class="section">
-        <span class="gujarati-title"
-          >બે વ્યક્તિની જન્મ તારીખ વચ્ચેનો ગેપ જાણવા માટે.</span
-        >
-        <label for="fromDate">From Date || શરૂ તારીખ પસંદ કરો.</label>
-        <input type="date" id="fromDate" />
-        <label for="toDate">To Date || અંત તારીખ પસંદ કરો.</label>
-        <input type="date" id="toDate" />
-        <button onclick="calculateGap()">Calculate Gap</button>
-        <div class="result" id="gapResult"></div>
+        <h2>Calculate Duration Between Two Dates / બે તારીખો વચ્ચે અવધિ ગણો</h2>
+        <div class="input-group">
+          <div>
+            <label for="startDay">First Date Day / પ્રથમ તારીખ દિવસ:</label>
+            <select id="startDay">
+              <option value="">Day</option>
+            </select>
+          </div>
+          <div>
+            <label for="startMonth"
+              >First Date Month / પ્રથમ તારીખ મહિનો:</label
+            >
+            <select id="startMonth">
+              <option value="">Month</option>
+              <option value="1">January / જાન્યુઆરી</option>
+              <option value="2">February / ફેબ્રુઆરી</option>
+              <option value="3">March / માર્ચ</option>
+              <option value="4">April / એપ્રિલ</option>
+              <option value="5">May / મે</option>
+              <option value="6">June / જૂન</option>
+              <option value="7">July / જુલાઈ</option>
+              <option value="8">August / ઓગસ્ટ</option>
+              <option value="9">September / સપ્ટેમ્બર</option>
+              <option value="10">October / ઓક્ટોબર</option>
+              <option value="11">November / નવેમ્બર</option>
+              <option value="12">December / ડિસેમ્બર</option>
+            </select>
+          </div>
+          <div>
+            <label for="startYear">First Date Year / પ્રથમ તારીખ વર્ષ:</label>
+            <select id="startYear">
+              <option value="">Year</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group date-gap">
+          <div>
+            <label for="endDay">Second Date Day / બીજી તારીખ દિવસ:</label>
+            <select id="endDay">
+              <option value="">Day</option>
+            </select>
+          </div>
+          <div>
+            <label for="endMonth">Second Date Month / બીજી તારીખ મહિનો:</label>
+            <select id="endMonth">
+              <option value="">Month</option>
+              <option value="1">January / જાન્યુઆરી</option>
+              <option value="2">February / ફેબ્રુઆરી</option>
+              <option value="3">March / માર્ચ</option>
+              <option value="4">April / એપ્રિલ</option>
+              <option value="5">May / મે</option>
+              <option value="6">June / જૂન</option>
+              <option value="7">July / જુલાઈ</option>
+              <option value="8">August / ઓગસ્ટ</option>
+              <option value="9">September / સપ્ટેમ્બર</option>
+              <option value="10">October / ઓક્ટોબર</option>
+              <option value="11">November / નવેમ્બર</option>
+              <option value="12">December / ડિસેમ્બર</option>
+            </select>
+          </div>
+          <div>
+            <label for="endYear">Second Date Year / બીજી તારીખ વર્ષ:</label>
+            <select id="endYear">
+              <option value="">Year</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="calculateAgeBetweenDates()">
+          Calculate Duration / અવધિ ગણો
+        </button>
+        <div id="dateRangeError" class="error"></div>
+        <div id="dateRangeResult" class="result">
+          <h3>Duration / અવધિ:</h3>
+          <p id="dateRangeOutputEnglish"></p>
+          <p id="dateRangeOutputGujarati" class="gujarati"></p>
+        </div>
       </div>
     </div>
 
     <script>
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker
-          .register("sw.js")
-          .then((reg) => console.log("Service Worker registered!", reg))
-          .catch((err) => console.error("SW registration failed:", err));
+      // Populate day dropdowns (1 to 31, non-dependent)
+      ["birthDay", "startDay", "endDay"].forEach((id) => {
+        const daySelect = document.getElementById(id);
+        for (let i = 1; i <= 31; i++) {
+          const option = document.createElement("option");
+          option.value = i;
+          option.textContent = i;
+          daySelect.appendChild(option);
+        }
+      });
+
+      // Populate year dropdowns (1900 to 2025)
+      ["birthYear", "startYear", "endYear"].forEach((id) => {
+        const yearSelect = document.getElementById(id);
+        const currentYear = 2025; // Current year as of July 23, 2025
+        for (let i = currentYear; i >= 1900; i--) {
+          const option = document.createElement("option");
+          option.value = i;
+          option.textContent = i;
+          yearSelect.appendChild(option);
+        }
+      });
+
+      function validateDate(day, month, year, errorDiv, errorPrefix) {
+        if (!day || !month || !year) {
+          errorDiv.textContent = `${errorPrefix}Please select a valid day, month, and year. / ${errorPrefix}કૃપા કરીને માન્ય દિવસ, મહિનો અને વર્ષ પસંદ કરો.`;
+          return false;
+        }
+
+        const date = new Date(year, month - 1, day);
+        const today = new Date(2025, 6, 23); // July 23, 2025, 05:19 PM IST
+
+        // Check if the date is valid
+        if (
+          date.getFullYear() != year ||
+          date.getMonth() + 1 != month ||
+          date.getDate() != day
+        ) {
+          errorDiv.textContent = `${errorPrefix}Invalid date. Please check your selection. / ${errorPrefix}અમાન્ય તારીખ. કૃપા કરીને તમારી પસંદગી તપાસો.`;
+          return false;
+        }
+
+        // For birth date, check if date is not in the future
+        if (errorPrefix === "" && date > today) {
+          errorDiv.textContent =
+            "Birth date cannot be in the future! / જન્મ તારીખ ભવિષ્યમાં હોઈ શકે નહી!";
+          return false;
+        }
+
+        errorDiv.textContent = "";
+        return true;
       }
-      function toGujaratiNumber(num) {
-        const gujaratiDigits = [
+
+      function calculateAge(startDate, endDate) {
+        // Determine which date is earlier
+        const earlierDate = startDate < endDate ? startDate : endDate;
+        const laterDate = startDate < endDate ? endDate : startDate;
+
+        let years = laterDate.getFullYear() - earlierDate.getFullYear();
+        let months = laterDate.getMonth() - earlierDate.getMonth();
+        let days = laterDate.getDate() - earlierDate.getDate();
+
+        if (days < 0) {
+          months--;
+          days += new Date(
+            laterDate.getFullYear(),
+            laterDate.getMonth(),
+            0
+          ).getDate();
+        }
+
+        if (months < 0) {
+          years--;
+          months += 12;
+        }
+
+        // If dates are the same, return 0 duration
+        if (years === 0 && months === 0 && days === 0) {
+          return { years: 0, months: 0, days: 0 };
+        }
+
+        return { years, months, days };
+      }
+
+      function toGujaratiOutput(years, months, days) {
+        const gujaratiNumbers = [
           "૦",
           "૧",
           "૨",
@@ -169,81 +462,96 @@
           "૮",
           "૯",
         ];
-        return num
-          .toString()
-          .split("")
-          .map((d) => gujaratiDigits[+d] || d)
-          .join("");
+        const toGujaratiNumber = (num) =>
+          String(num)
+            .split("")
+            .map((d) => gujaratiNumbers[d])
+            .join("");
+        return `${toGujaratiNumber(years)} વર્ષ, ${toGujaratiNumber(
+          months
+        )} મહિના, ${toGujaratiNumber(days)} દિવસ`;
       }
 
-      function calculateDifference(from, to) {
-        let years = to.getFullYear() - from.getFullYear();
-        let months = to.getMonth() - from.getMonth();
-        let days = to.getDate() - from.getDate();
+      function calculateAgeFromBirth() {
+        const day = document.getElementById("birthDay").value;
+        const month = document.getElementById("birthMonth").value;
+        const year = document.getElementById("birthYear").value;
+        const resultDiv = document.getElementById("birthResult");
+        const ageOutputEnglish = document.getElementById(
+          "birthAgeOutputEnglish"
+        );
+        const ageOutputGujarati = document.getElementById(
+          "birthAgeOutputGujarati"
+        );
+        const errorDiv = document.getElementById("birthError");
 
-        if (days < 0) {
-          months--;
-          days += new Date(to.getFullYear(), to.getMonth(), 0).getDate();
-        }
-
-        if (months < 0) {
-          years--;
-          months += 12;
-        }
-
-        return { years, months, days };
-      }
-
-      function calculateAge() {
-        const input = document.getElementById("birthDate").value;
-        const result = document.getElementById("ageResult");
-
-        if (!input) {
-          result.innerHTML = "Please select your birth date.";
+        if (!validateDate(day, month, year, errorDiv, "")) {
+          resultDiv.style.display = "none";
           return;
         }
 
-        const birthDate = new Date(input);
-        const today = new Date();
-        const { years, months, days } = calculateDifference(birthDate, today);
+        const birthDate = new Date(year, month - 1, day);
+        const today = new Date(2025, 6, 23); // July 23, 2025, 05:19 PM IST
 
-        result.innerHTML = `
-        <strong>English:</strong> You are ${years} years, ${months} months, and ${days} days old.<br>
-        <strong>Gujarati:</strong> તમે ${toGujaratiNumber(
-          years
-        )} વર્ષ, ${toGujaratiNumber(months)} મહિના અને ${toGujaratiNumber(
-          days
-        )} દિવસના છો.
-      `;
+        const age = calculateAge(birthDate, today);
+        ageOutputEnglish.textContent = `${age.years} years, ${age.months} months, ${age.days} days`;
+        ageOutputGujarati.textContent = toGujaratiOutput(
+          age.years,
+          age.months,
+          age.days
+        );
+        resultDiv.style.display = "block";
+        errorDiv.textContent = "";
       }
 
-      function calculateGap() {
-        const fromInput = document.getElementById("fromDate").value;
-        const toInput = document.getElementById("toDate").value;
-        const result = document.getElementById("gapResult");
+      function calculateAgeBetweenDates() {
+        const startDay = document.getElementById("startDay").value;
+        const startMonth = document.getElementById("startMonth").value;
+        const startYear = document.getElementById("startYear").value;
+        const endDay = document.getElementById("endDay").value;
+        const endMonth = document.getElementById("endMonth").value;
+        const endYear = document.getElementById("endYear").value;
+        const resultDiv = document.getElementById("dateRangeResult");
+        const ageOutputEnglish = document.getElementById(
+          "dateRangeOutputEnglish"
+        );
+        const ageOutputGujarati = document.getElementById(
+          "dateRangeOutputGujarati"
+        );
+        const errorDiv = document.getElementById("dateRangeError");
 
-        if (!fromInput || !toInput) {
-          result.innerHTML = "Please select both dates.";
+        // Validate both dates
+        if (
+          !validateDate(
+            startDay,
+            startMonth,
+            startYear,
+            errorDiv,
+            "First date: "
+          )
+        ) {
+          resultDiv.style.display = "none";
+          return;
+        }
+        if (
+          !validateDate(endDay, endMonth, endYear, errorDiv, "Second date: ")
+        ) {
+          resultDiv.style.display = "none";
           return;
         }
 
-        let fromDate = new Date(fromInput);
-        let toDate = new Date(toInput);
+        const startDate = new Date(startYear, startMonth - 1, startDay);
+        const endDate = new Date(endYear, endMonth - 1, endDay);
 
-        if (fromDate > toDate) {
-          [fromDate, toDate] = [toDate, fromDate];
-        }
-
-        const { years, months, days } = calculateDifference(fromDate, toDate);
-
-        result.innerHTML = `
-        <strong>English:</strong> The gap between dates is ${years} years, ${months} months, and ${days} days.<br>
-        <strong>Gujarati:</strong> તારીખ વચ્ચેનો અંતર ${toGujaratiNumber(
-          years
-        )} વર્ષ, ${toGujaratiNumber(months)} મહિના અને ${toGujaratiNumber(
-          days
-        )} દિવસ છે.
-      `;
+        const age = calculateAge(startDate, endDate);
+        ageOutputEnglish.textContent = `${age.years} years, ${age.months} months, ${age.days} days`;
+        ageOutputGujarati.textContent = toGujaratiOutput(
+          age.years,
+          age.months,
+          age.days
+        );
+        resultDiv.style.display = "block";
+        errorDiv.textContent = "";
       }
     </script>
   </body>
